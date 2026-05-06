@@ -1,39 +1,37 @@
-import dotenv from "dotenv";
 import express from "express";
 import mongoose from "mongoose";
-
-dotenv.config();
+import config from "./utils/config.js";
+import logger from "./utils/logger.js";
+import blogsRouter from "./controllers/blogs.js";
+import middleware from "./utils/middleware.js";
 
 const app = express();
-
 const blogSchema = new mongoose.Schema({
   title: String,
   author: String,
   url: String,
   likes: Number,
 });
+const PORT = config.PORT;
+const mongooseUrl = config.mongooseUrl;
 
-const Blog = mongoose.model("Blog", blogSchema);
+const connectDB = async () => {
+  try {
+    await mongoose.connect(mongooseUrl, { family: 4 });
+    logger.info("Connected to MongoDB");
+  } catch (error) {
+    logger.error("Error connecting to MongoDB:", error.message);
+  }
+};
 
-const mongooseUrl = process.env.MONGODB_URI;
-mongoose.connect(mongooseUrl, { family: 4 });
-
+connectDB();
+app.use(express.static("dist"));
 app.use(express.json());
+app.use(middleware.requestLogger);
+app.use("/api/blogs", blogsRouter);
+app.use(middleware.unknownEndpoint);
+app.use(middleware.errorHandler);
 
-app.get("/api/blogs", async (request, response) => {
-  Blog.find({}).then((blogs) => {
-    response.json(blogs);
-  });
-});
-
-app.post("/api/blogs", (request, response) => {
-  const blog = new Blog(request.body);
-  blog.save().then((result) => {
-    response.status(201).json(result);
-  });
-});
-
-const PORT = process.env.PORT || 3003;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
